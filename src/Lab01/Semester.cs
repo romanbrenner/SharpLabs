@@ -2,69 +2,71 @@ namespace Lab01;
 
 public sealed class Semester
 {
-    public const int DayCount = 100;
-    public const int SubjectCount = 6;
-
-    public static IReadOnlyList<string> SubjectNames { get; } = Array.AsReadOnly(new[]
-    {
-        "Матанализ", "Линейная алгебра", "Дискретная математика",
-        "Программирование", "Физика", "Английский язык"
-    });
-
     private readonly Teacher[] teachers;
     private readonly Random random;
+    private readonly SimulationSettings settings;
 
-    public Semester(IReadOnlyList<Teacher> teachers, Random random)
+    public Semester(IReadOnlyList<Teacher> teachers, Random random, SimulationSettings settings)
     {
-        if (teachers.Count != SubjectCount)
-            throw new ArgumentException("В семестре должно быть шесть преподавателей.");
+        settings.Validate();
+        if (teachers.Count != Subjects.Names.Count)
+            throw new ArgumentException("Количество преподавателей должно совпадать с количеством предметов.");
 
         this.teachers = teachers.ToArray();
         this.random = random;
+        this.settings = settings;
     }
 
-    public SemesterResult Run(IStudentStrategy strategy)
+    public SemesterResult Run(ISkipStrategy strategy)
     {
-        IReadOnlyList<bool> yesterday = Array.AsReadOnly(new bool[SubjectCount]);
+        bool[] yesterday = new bool[Subjects.Names.Count];
+        List<DayObservation> observations = new List<DayObservation>();
         int pleasure = 0;
 
-        for (int day = 1; day <= DayCount; day++)
+        for (int day = 1; day <= settings.DayCount; day++)
         {
-            bool[] today = new bool[SubjectCount];
-            for (int subject = 0; subject < SubjectCount; subject++)
+            bool[] decision = strategy.DecideDay(day, new StudentHistory(observations));
+            if (decision is null || decision.Length != Subjects.Names.Count)
+                throw new InvalidOperationException("Стратегия должна вернуть решение для каждого предмета.");
+
+            // Копия защищает принятое решение от последующего изменения массива стратегией.
+            bool[] attendance = decision.ToArray();
+            bool[] today = new bool[Subjects.Names.Count];
+            for (int subject = 0; subject < today.Length; subject++)
                 today[subject] = teachers[subject].WillAsk(yesterday, random);
 
-            for (int subject = 0; subject < SubjectCount; subject++)
+            for (int subject = 0; subject < today.Length; subject++)
             {
-                int remainingLessons = (DayCount - day) * SubjectCount + SubjectCount - subject;
-                int remainingPies = DayCount - day + 1;
-                int maximumFinalPleasure = pleasure + remainingLessons + remainingPies;
-
-                if (strategy.ShouldSkip(subject, yesterday, maximumFinalPleasure))
+                if (!attendance[subject])
                 {
                     if (today[subject])
-                        return new SemesterResult(0, day - 1, day, subject);
+                        return new SemesterResult(0, day - 1, settings.DayCount, day, (Subject)subject);
 
-                    pleasure++;
+                    pleasure += settings.SkipPleasure;
                 }
             }
 
-            pleasure++; // Пирожок после успешного учебного дня.
-            IReadOnlyList<bool> observedToday = Array.AsReadOnly(today);
-            strategy.ObserveDay(yesterday, observedToday);
-            yesterday = observedToday;
+            pleasure += settings.PiePleasure;
+            bool?[] knownResults = new bool?[today.Length];
+            for (int subject = 0; subject < today.Length; subject++)
+                knownResults[subject] = attendance[subject] ? today[subject] : null;
+
+            observations.Add(new DayObservation(attendance, knownResults));
+            // Модель использует реальные опросы, включая пропущенные пары.
+            yesterday = today;
         }
 
-        return new SemesterResult(pleasure, DayCount, null, null);
+        return new SemesterResult(pleasure, settings.DayCount, settings.DayCount, null, null);
     }
 }
 
 public sealed record SemesterResult(
     int TotalPleasure,
     int CompletedDays,
+    int TotalDays,
     int? ExpelledDay,
-    int? ExpelledSubject)
+    Subject? ExpelledSubject)
 {
     public bool IsExpelled => ExpelledDay.HasValue;
-    public double AveragePerDay => (double)TotalPleasure / Semester.DayCount;
+    public double AveragePerDay => (double)TotalPleasure / TotalDays;
 }
