@@ -1,4 +1,4 @@
-namespace Lab01;
+namespace SharpLabs.Core;
 
 public enum QuestionRule
 {

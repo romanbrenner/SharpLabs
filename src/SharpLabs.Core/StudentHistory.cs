@@ -1,26 +1,29 @@
-namespace Lab01;
+namespace SharpLabs.Core;
 
 // В историю передаются только завершённые дни и доступные студенту результаты.
 internal sealed class StudentHistory : IReadOnlyStudentHistory
 {
-    private readonly DayObservation[] days;
+    private readonly IReadOnlyList<DayObservation> days;
+    private readonly int visibleDays;
 
     public StudentHistory(IReadOnlyList<DayObservation> days)
     {
-        // Снимок не пополняется после передачи стратегии.
-        this.days = days.ToArray();
+        // Снимок видит только дни, существовавшие на момент его создания.
+        // Копировать всю накопленную историю на каждом шаге не требуется.
+        this.days = days;
+        visibleDays = days.Count;
     }
 
     public bool Attended(int day, Subject subject)
     {
         Validate(day, subject);
-        return day <= days.Length && days[day - 1].Attendance[(int)subject];
+        return day <= visibleDays && days[day - 1].Attendance[(int)subject];
     }
 
     public bool? WasAsked(int day, Subject subject)
     {
         Validate(day, subject);
-        return day <= days.Length ? days[day - 1].Asked[(int)subject] : null;
+        return day <= visibleDays ? days[day - 1].Asked[(int)subject] : null;
     }
 
     private static void Validate(int day, Subject subject)

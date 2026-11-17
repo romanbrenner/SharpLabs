@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Lab01;
+using SharpLabs.Core;
 
 (string Name, Action Run)[] tests =
 {
