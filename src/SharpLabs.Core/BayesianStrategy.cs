@@ -1,24 +1,26 @@
-namespace Lab01;
+namespace SharpLabs.Core;
 
 public sealed class BayesianStrategy : ISkipStrategy
 {
     private readonly SimulationSettings settings;
+    private readonly bool continuous;
     private readonly List<Hypothesis>[] hypotheses = new List<Hypothesis>[Subjects.Names.Count];
     private int processedDays;
-    private int pleasure;
+    private long pleasure;
 
     public string Name => "Обучение по истории опросов";
 
-    public BayesianStrategy(SimulationSettings settings)
+    public BayesianStrategy(SimulationSettings settings, bool continuous = false)
     {
         settings.Validate();
         this.settings = settings;
+        this.continuous = continuous;
         Reset();
     }
 
     public bool[] DecideDay(int day, IReadOnlyStudentHistory history)
     {
-        if (day < 1 || day > settings.DayCount)
+        if (day < 1 || (!continuous && day > settings.DayCount))
             throw new ArgumentOutOfRangeException(nameof(day));
         if (day == 1)
             Reset();
@@ -44,8 +46,9 @@ public sealed class BayesianStrategy : ISkipStrategy
         }
 
         bool?[] previous = PreviousResults(day, history);
-        int remainingDays = settings.DayCount - day + 1;
-        int maximumFinalPleasure = pleasure + remainingDays *
+        // В бесконечном режиме используется постоянный горизонт планирования.
+        int remainingDays = continuous ? settings.DayCount : settings.DayCount - day + 1;
+        long maximumFinalPleasure = pleasure + (long)remainingDays *
             (Subjects.Names.Count * settings.SkipPleasure + settings.PiePleasure);
         bool[] attendance = new bool[Subjects.Names.Count];
 

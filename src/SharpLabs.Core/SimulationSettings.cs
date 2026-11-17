@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Lab01;
+namespace SharpLabs.Core;
 
 public sealed record SimulationSettings
 {

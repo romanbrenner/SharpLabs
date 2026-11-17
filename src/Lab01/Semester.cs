@@ -1,3 +1,5 @@
+using SharpLabs.Core;
+
 namespace Lab01;
 
 public sealed class Semester
@@ -19,44 +21,19 @@ public sealed class Semester
 
     public SemesterResult Run(ISkipStrategy strategy)
     {
-        bool[] yesterday = new bool[Subjects.Names.Count];
-        List<DayObservation> observations = new List<DayObservation>();
-        int pleasure = 0;
+        IDaySimulation simulation = new DaySimulation(new TeacherService(teachers, random),
+            new StudentHistoryStore(), strategy, settings);
+        long pleasure = 0;
 
         for (int day = 1; day <= settings.DayCount; day++)
         {
-            bool[] decision = strategy.DecideDay(day, new StudentHistory(observations));
-            if (decision is null || decision.Length != Subjects.Names.Count)
-                throw new InvalidOperationException("Стратегия должна вернуть решение для каждого предмета.");
-
-            // Копия защищает принятое решение от последующего изменения массива стратегией.
-            bool[] attendance = decision.ToArray();
-            bool[] today = new bool[Subjects.Names.Count];
-            for (int subject = 0; subject < today.Length; subject++)
-                today[subject] = teachers[subject].WillAsk(yesterday, random);
-
-            for (int subject = 0; subject < today.Length; subject++)
-            {
-                if (!attendance[subject])
-                {
-                    if (today[subject])
-                        return new SemesterResult(0, day - 1, settings.DayCount, day, (Subject)subject);
-
-                    pleasure += settings.SkipPleasure;
-                }
-            }
-
-            pleasure += settings.PiePleasure;
-            bool?[] knownResults = new bool?[today.Length];
-            for (int subject = 0; subject < today.Length; subject++)
-                knownResults[subject] = attendance[subject] ? today[subject] : null;
-
-            observations.Add(new DayObservation(attendance, knownResults));
-            // Модель использует реальные опросы, включая пропущенные пары.
-            yesterday = today;
+            DayResult result = simulation.NextDay();
+            if (result.IsExpelled)
+                return new SemesterResult(0, day - 1, settings.DayCount, day, result.ExpelledSubject);
+            pleasure = result.TotalPleasure;
         }
 
-        return new SemesterResult(pleasure, settings.DayCount, settings.DayCount, null, null);
+        return new SemesterResult(checked((int)pleasure), settings.DayCount, settings.DayCount, null, null);
     }
 }
 
