@@ -59,3 +59,13 @@ dotnet build SharpLabs.sln --configuration Release
 dotnet run --project tests/Lab01.Tests --configuration Release
 dotnet run --project tests/Lab02.Tests --configuration Release
 ```
+
+## Лабораторная работа 3. Unit-тесты
+
+Тесты на NUnit проверяют правила преподавателей, решения стратегии по истории опросов и поведение эмулятора при посещении, прогуле и отчислении. Все случайные значения в тестах заданы заранее.
+
+Запуск из корня репозитория:
+
+```powershell
+dotnet test tests/Lab03.Tests/Lab03.Tests.csproj
+```
